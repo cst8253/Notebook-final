@@ -1,61 +1,157 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@inject IConfiguration Config
 
 <PageTitle>Notebook</PageTitle>
 
 <h1 class="display-4 text-center p-5">Notebook</h1>
 
-<form class="bg-light border border-1 p-5 mb-5">
+<EditForm class="bg-light border border-1 p-5 mb-5"
+  Model="NewNote" OnSubmit="() => CreateNoteAsync()" Enhance>
   <div class="form-group mb-3">
-    <label for="newTitle" class="form-label">Title</label>
-    <input type="text" id="newTitle" class="form-control" />
+    <label for="title" class="form-label">Title</label>
+    <InputText id="title" class="form-control" @bind-Value="NewNote.Title" />
   </div>
   <div class="form-group mb-3">
-    <label for="newContent" class="form-label">Content</label>
-    <textarea id="newContent" class="form-control"></textarea>
+    <label for="content" class="form-label">Content</label>
+    <InputTextArea id="content" class="form-control" @bind-Value="NewNote.Content" />
   </div>
 
   <button class="btn btn-primary">Add Note</button>
-</form>
+</EditForm>
 
 
 <div class="row">
   <!-- NOTE TEMPLATE -->
+  @foreach (var note in notes)
+  {
   <div class="col-4">
     <div class="card my-3">
       <div class="card-header d-flex justify-content-end">
-        <button class="btn btn-light">
+        <button class="btn btn-light" @onclick="() => DisplayDialog(note.Id)">
           <i class="bi bi-pencil-square"></i>
         </button>
-        <button class="btn btn-light">
+        <button class="btn btn-light" @onclick="() => DeleteNoteAsync(note.Id)">
           <i class="bi bi-x-square"></i>
         </button>
       </div>
       <div class="card-body">
-        <h2>Title</h2>
-        <p>Content</p>
+        <h2>@note.Title</h2>
+        <p>@note.Content</p>
       </div>
     </div>
   </div>
+  }
   <!-- NOTE TEMPLATE -->
 </div>
 
-<dialog>
-  <form class="bg-light border border-1 p-5 mb-5 m-auto w-75">
+<dialog open="@showDialog">
+  <EditForm class="bg-light border border-1 p-5 mb-5 m-auto w-75" 
+    Model="EditNote" OnSubmit="() => UpdateNoteAsync()" Enhance>
     <div class="form-group mb-3">
       <label for="title" class="form-label">Title</label>
-      <input type="text" id="title" class="form-control" />
+      <InputText id="title" class="form-control" @bind-Value="EditNote.Title" />
     </div>
     <div class="form-group mb-3">
       <label for="content" class="form-label">Content</label>
-      <textarea id="content" class="form-control"></textarea>
+      <InputTextArea id="content" class="form-control" @bind-Value="EditNote.Content" />
     </div>
 
     <button type="submit" class="btn btn-primary me-3">Add Note</button>
-    <button type="button" class="btn btn-secondary">Cancel</button>
-  </form>
+    <button type="button" class="btn btn-secondary" @onclick="CloseDialog">Cancel</button>
+  </EditForm>
 </dialog>
 
 
 @code {
+  private string? connectionString;
+  private List<Note> notes = [];
+
+  [SupplyParameterFromForm]
+  private Note NewNote { get; set; } = new();
+
+  [SupplyParameterFromForm]
+  private Note EditNote { get; set; } = new();
+
+  private bool showDialog = false;
   
+  protected override async Task OnInitializedAsync()
+  {
+    connectionString = Config.GetConnectionString("default");
+    notes = await GetNotesAsync();
+  }
+
+  private async Task<List<Note>> GetNotesAsync()
+  {
+    using (var conn = new MySqlConnection(connectionString))
+    {
+      var sql = "SELECT * FROM Note";
+      var rows = await conn.QueryAsync<Note>(sql);
+      return rows.ToList();
+    }
+  }
+
+  private async Task<Note> GetNoteAsync(int id)
+  {
+    using (var conn = new MySqlConnection(connectionString))
+    {
+      try 
+      {      
+        var sql = "SELECT * FROM Note WHERE Id = @Id";
+        return await conn.QuerySingleAsync<Note>(sql, new { Id = id });
+      } 
+      catch (InvalidOperationException)
+      {
+        throw;
+      }
+    }
+  }
+
+  private async Task CreateNoteAsync()
+  {
+    using (var conn = new MySqlConnection(connectionString))
+    {
+      var sql = "INSERT INTO Note (Title, Content) VALUES (@Title, @Content)";
+      await conn.ExecuteAsync(sql, new { 
+        Title = NewNote.Title, 
+        Content= NewNote.Content
+      });
+    }
+    NewNote = new();
+    notes = await GetNotesAsync();
+  }
+
+  private async Task DisplayDialog(int id)
+  {
+    EditNote = await GetNoteAsync(id);
+    showDialog = true;
+  }
+
+  private void CloseDialog ()
+  {
+    showDialog = false;
+    EditNote = new();
+  }
+
+  private async Task UpdateNoteAsync()
+  {
+    using (var conn = new MySqlConnection(connectionString))
+    {
+      var sql = "UPDATE Note SET Title = @Title, Content = @Content WHERE Id = @Id";
+      await conn.ExecuteAsync(sql, EditNote);
+    }
+    CloseDialog();
+    notes = await GetNotesAsync();
+  }
+
+  private async Task DeleteNoteAsync(int id)
+  {
+    using (var conn = new MySqlConnection(connectionString))
+    {
+      var sql = "DELETE from Note WHERE Id = @Id";
+      await conn.ExecuteAsync(sql, new { Id = id });
+    }
+
+    notes = await GetNotesAsync();
+  }
 }
