@@ -5,16 +5,17 @@
 <PageTitle>Notebook</PageTitle>
 
 <h1 class="display-4 text-center p-5">Notebook</h1>
-
+// 2-way data binding between form and local data object
+// action biding of form change (submit in this case)
 <EditForm class="bg-light border border-1 p-5 mb-5"
   Model="NewNote" OnSubmit="() => CreateNoteAsync()" Enhance>
-  <div class="form-group mb-3">
+  <div class="form-group mb-3"> 
     <label for="title" class="form-label">Title</label>
-    <InputText id="title" class="form-control" @bind-Value="NewNote.Title" />
+    <InputText id="title" class="form-control" @bind-Value="NewNote.Title" /> // data-binding at form field level
   </div>
   <div class="form-group mb-3">
     <label for="content" class="form-label">Content</label>
-    <InputTextArea id="content" class="form-control" @bind-Value="NewNote.Content" />
+    <InputTextArea id="content" class="form-control" @bind-Value="NewNote.Content" /> // data-binding at form field level
   </div>
 
   <button class="btn btn-primary">Add Note</button>
@@ -36,7 +37,7 @@
         </button>
       </div>
       <div class="card-body">
-        <h2>@note.Title</h2>
+        <h2>@note.Title</h2> // bind data from DB
         <p>@note.Content</p>
       </div>
     </div>
@@ -45,7 +46,7 @@
   <!-- NOTE TEMPLATE -->
 </div>
 
-<dialog open="@showDialog">
+<dialog open="@showDialog"> // conditionally open dialog with local bool parameter
   <EditForm class="bg-light border border-1 p-5 mb-5 m-auto w-75" 
     Model="EditNote" OnSubmit="() => UpdateNoteAsync()" Enhance>
     <div class="form-group mb-3">
@@ -65,13 +66,13 @@
 
 @code {
   private string? connectionString;
-  private List<Note> notes = [];
+  private List<Note> notes = []; // for data from DB
 
   [SupplyParameterFromForm]
-  private Note NewNote { get; set; } = new();
+  private Note NewNote { get; set; } = new(); // for data interaction with new note form
 
   [SupplyParameterFromForm]
-  private Note EditNote { get; set; } = new();
+  private Note EditNote { get; set; } = new(); // for data interaction with edit note form
 
   private bool showDialog = false;
   
@@ -86,8 +87,8 @@
     using (var conn = new MySqlConnection(connectionString))
     {
       var sql = "SELECT * FROM Note";
-      var rows = await conn.QueryAsync<Note>(sql);
-      return rows.ToList();
+      var rows = await conn.QueryAsync<Note>(sql); // iEnum returned
+      return rows.ToList(); // convert to list 
     }
   }
 
@@ -98,11 +99,11 @@
       try 
       {      
         var sql = "SELECT * FROM Note WHERE Id = @Id";
-        return await conn.QuerySingleAsync<Note>(sql, new { Id = id });
+        return await conn.QuerySingleAsync<Note>(sql, new { Id = id });  //.QuerySingleAsyn can throw error must use try...catch...block
       } 
       catch (InvalidOperationException)
       {
-        throw;
+        throw; // disregard error and continue
       }
     }
   }
@@ -118,7 +119,7 @@
       });
     }
     NewNote = new();
-    notes = await GetNotesAsync();
+    notes = await GetNotesAsync(); // refresh/reload the display with updated contents (one new note added)
   }
 
   private async Task DisplayDialog(int id)
@@ -138,7 +139,7 @@
     using (var conn = new MySqlConnection(connectionString))
     {
       var sql = "UPDATE Note SET Title = @Title, Content = @Content WHERE Id = @Id";
-      await conn.ExecuteAsync(sql, EditNote);
+      await conn.ExecuteAsync(sql, EditNote); // the object EditNote already exits, no need to initiate with new kywd
     }
     CloseDialog();
     notes = await GetNotesAsync();
